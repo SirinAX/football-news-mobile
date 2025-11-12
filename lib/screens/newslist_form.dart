@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:football_news/widgets/left_drawer.dart';
+import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:pbp_django_auth/pbp_django_auth.dart';
+import 'package:football_news/screens/menu.dart';
 
 class NewsFormPage extends StatefulWidget {
   const NewsFormPage({super.key});
@@ -27,6 +31,8 @@ class _NewsFormPageState extends State<NewsFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    final request = context.watch<CookieRequest>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Center(
@@ -34,7 +40,7 @@ class _NewsFormPageState extends State<NewsFormPage> {
             'Form Tambah Berita',
           ),
         ),
-        backgroundColor: Colors.indigo,
+        backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
 
@@ -162,67 +168,60 @@ class _NewsFormPageState extends State<NewsFormPage> {
                 alignment: Alignment.bottomCenter,
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
-                child: ElevatedButton(
-                          style: ButtonStyle(
-                            backgroundColor:
-                                MaterialStateProperty.all(Colors.indigo),
-                          ),
-                            onPressed: () {
-                              if (_formKey.currentState!.validate()) {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return AlertDialog(
-                                      title: const Text('Berita berhasil disimpan'),
-                                      content: SingleChildScrollView(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text('Judul: $_title'),
-                                            const SizedBox(height: 8),
-                                            Text('Isi Berita: $_content'),
-                                            const SizedBox(height: 8),
-                                            Text('Kategori: $_category'),
-                                            const SizedBox(height: 8),
-                                            Text('URL Thumbnail: ${_thumbnail.isEmpty ? "-" : _thumbnail}'),
-                                            const SizedBox(height: 8),
-                                            Text('Berita Unggulan: ${_isFeatured ? "Ya" : "Tidak"}'),
-                                          ],
-                                        ),
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          child: const Text('OK'),
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
+                  child: ElevatedButton(
+                    style: ButtonStyle(
+                      backgroundColor:
+                          MaterialStateProperty.all(Colors.indigo),
+                    ),
+                    onPressed: () async {
+                      if (_formKey.currentState!.validate()) {
+                        // URL untuk Chrome → Django lokal
+                        final response = await request.postJson(
+                          "http://localhost:8000/create-flutter/",
+                          jsonEncode({
+                            "title": _title,
+                            "content": _content,
+                            "thumbnail": _thumbnail,
+                            "category": _category,
+                            "is_featured": _isFeatured,
+                          }),
+                        );
 
-                                // Reset form agar kosong kembali setelah disimpan
-                                _formKey.currentState!.reset();
-                                setState(() {
-                                  _category = "update";
-                                  _isFeatured = false;
-                                  _thumbnail = "";
-                                });
-                              }
-                            },
-
-                          child: const Text(
-                            "Save",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                                ),
+                        if (context.mounted) {
+                          if (response['status'] == 'success') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("News successfully saved!"),
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                }
+                            );
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>MyHomePage(),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    "Something went wrong, please try again."),
+                              ),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    child: const Text(
+                      "Save",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
